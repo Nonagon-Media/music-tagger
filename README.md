@@ -15,29 +15,7 @@ A self-hosted Docker application for auditing and correcting music library metad
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  Docker Compose Stack                                   │
-│                                                         │
-│  ┌─────────┐    ┌─────────────────────────────────────┐│
-│  │  Redis  │───▶│  Queues: analysis, review,          ││
-│  │         │    │          processing, failed         ││
-│  └─────────┘    └─────────────────────────────────────┘│
-│       │                                                 │
-│       ▼                                                 │
-│  ┌─────────────────┐    ┌─────────────────┐            │
-│  │ Analysis Worker │    │ Processing      │            │
-│  │ - fingerprint   │    │ Worker          │            │
-│  │ - AcoustID      │    │ - write tags    │            │
-│  │ - MusicBrainz   │    │ - throttled     │            │
-│  └─────────────────┘    └─────────────────┘            │
-│                                                         │
-│  ┌─────────────────┐    ┌─────────────────┐            │
-│  │ Review UI       │    │ rq-dashboard    │            │
-│  │ :8080           │    │ :9181           │            │
-│  └─────────────────┘    └─────────────────┘            │
-└─────────────────────────────────────────────────────────┘
-```
+![Music Tagger Architecture](docs/architecture.png)
 
 ## Prerequisites
 

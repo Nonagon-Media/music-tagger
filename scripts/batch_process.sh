@@ -21,9 +21,9 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
 
-get_pending_count() {
-    sqlite3 "$DATA_DIR/music_tagger.db" \
-        "SELECT COUNT(*) FROM jobs WHERE status IN ('pending', 'processing');" 2>/dev/null || echo "0"
+get_queue_depth() {
+    # Check Redis queue directly - more reliable than SQLite status
+    redis-cli -h redis LLEN rq:queue:analysis 2>/dev/null || echo "0"
 }
 
 get_artist_track_count() {
@@ -39,12 +39,14 @@ get_artist_processed_count() {
 
 wait_for_jobs() {
     log "Waiting for current jobs to complete..."
+    # Small delay to let jobs get queued
+    sleep 5
     while true; do
-        pending=$(get_pending_count)
-        if [ "$pending" -eq 0 ]; then
+        queue_depth=$(get_queue_depth)
+        if [ "$queue_depth" -eq 0 ]; then
             break
         fi
-        log "  $pending jobs still processing..."
+        log "  $queue_depth jobs in analysis queue..."
         sleep "$POLL_INTERVAL"
     done
     log "All jobs completed"

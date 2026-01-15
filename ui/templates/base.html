@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Music Tagger{% endblock %}</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background: #16213e;
+            padding: 15px 0;
+            margin-bottom: 30px;
+        }
+        header .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        header h1 {
+            font-size: 1.5rem;
+        }
+        header h1 a {
+            color: #eee;
+            text-decoration: none;
+        }
+        nav a {
+            color: #8892b0;
+            text-decoration: none;
+            margin-left: 20px;
+        }
+        nav a:hover {
+            color: #64ffda;
+        }
+        .card {
+            background: #16213e;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            margin-bottom: 15px;
+            color: #64ffda;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        .stat-card {
+            background: #0f3460;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            background: #1a4a7a;
+        }
+        .stat-card .count {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #64ffda;
+        }
+        .stat-card .label {
+            color: #8892b0;
+            font-size: 0.9rem;
+        }
+        .stat-card.review .count { color: #ffd700; }
+        .stat-card.failed .count { color: #ff6b6b; }
+        .stat-card.done .count { color: #51cf66; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #0f3460;
+        }
+        th {
+            background: #0f3460;
+            color: #64ffda;
+        }
+        tr:hover {
+            background: #1a3a5c;
+        }
+        .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+        .btn-approve {
+            background: #51cf66;
+            color: #000;
+        }
+        .btn-approve:hover {
+            background: #40c057;
+        }
+        .btn-reject {
+            background: #ff6b6b;
+            color: #fff;
+        }
+        .btn-reject:hover {
+            background: #fa5252;
+        }
+        .btn-retry {
+            background: #ffd700;
+            color: #000;
+        }
+        .btn-secondary {
+            background: #495057;
+            color: #fff;
+        }
+        .confidence {
+            font-weight: bold;
+        }
+        .confidence.high { color: #51cf66; }
+        .confidence.medium { color: #ffd700; }
+        .confidence.low { color: #ff6b6b; }
+        .diff-table {
+            width: 100%;
+            margin: 15px 0;
+        }
+        .diff-table td {
+            width: 50%;
+            vertical-align: top;
+        }
+        .diff-current {
+            background: #2d1f1f;
+        }
+        .diff-matched {
+            background: #1f2d1f;
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .pagination a {
+            padding: 8px 12px;
+            background: #0f3460;
+            color: #eee;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+        .pagination a:hover {
+            background: #1a4a7a;
+        }
+        .pagination .current {
+            background: #64ffda;
+            color: #000;
+        }
+        .checkbox-col {
+            width: 40px;
+        }
+        .bulk-actions {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #64ffda;
+            text-decoration: none;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .meta-field {
+            margin-bottom: 8px;
+        }
+        .meta-label {
+            color: #8892b0;
+            font-size: 0.85rem;
+        }
+        .meta-value {
+            font-size: 1.1rem;
+        }
+        .meta-diff {
+            color: #ffd700;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1><a href="/">Music Tagger</a></h1>
+            <nav>
+                <a href="/">Dashboard</a>
+                <a href="/queue/review">Review Queue</a>
+                <a href="http://localhost:9181" target="_blank">rq-dashboard</a>
+            </nav>
+        </div>
+    </header>
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+    <script>
+        function approveJob(jobId) {
+            fetch(`/api/approve/${jobId}`, { method: 'POST' })
+                .then(r => r.json())
+                .then(() => location.reload());
+        }
+        function rejectJob(jobId) {
+            fetch(`/api/reject/${jobId}`, { method: 'POST' })
+                .then(r => r.json())
+                .then(() => location.reload());
+        }
+        function retryJob(jobId) {
+            fetch(`/api/retry/${jobId}`, { method: 'POST' })
+                .then(r => r.json())
+                .then(() => location.reload());
+        }
+        function bulkApprove() {
+            const checked = document.querySelectorAll('input[name="job_id"]:checked');
+            const ids = Array.from(checked).map(c => parseInt(c.value));
+            if (ids.length === 0) return alert('No items selected');
+            fetch('/api/bulk-approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ job_ids: ids })
+            }).then(() => location.reload());
+        }
+        function bulkReject() {
+            const checked = document.querySelectorAll('input[name="job_id"]:checked');
+            const ids = Array.from(checked).map(c => parseInt(c.value));
+            if (ids.length === 0) return alert('No items selected');
+            if (!confirm(`Reject ${ids.length} items?`)) return;
+            fetch('/api/bulk-reject', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ job_ids: ids })
+            }).then(() => location.reload());
+        }
+        function selectAll(checkbox) {
+            document.querySelectorAll('input[name="job_id"]').forEach(c => c.checked = checkbox.checked);
+        }
+    </script>
+</body>
+</html>

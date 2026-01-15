@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Music Tagger{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Queue Status</h2>
+    <p style="color: #8892b0; margin-bottom: 20px;">
+        Auto-approve threshold: {{ threshold }}% confidence
+    </p>
+    <div class="stats-grid">
+        <div class="stat-card" onclick="location.href='/queue/analysis'">
+            <div class="count">{{ stats.analysis }}</div>
+            <div class="label">Analysis Queue</div>
+        </div>
+        <div class="stat-card review" onclick="location.href='/queue/review'">
+            <div class="count">{{ stats.review }}</div>
+            <div class="label">Needs Review</div>
+        </div>
+        <div class="stat-card" onclick="location.href='/queue/processing'">
+            <div class="count">{{ stats.processing }}</div>
+            <div class="label">Processing</div>
+        </div>
+        <div class="stat-card done" onclick="location.href='/queue/done'">
+            <div class="count">{{ stats.done }}</div>
+            <div class="label">Completed</div>
+        </div>
+        <div class="stat-card failed" onclick="location.href='/queue/failed'">
+            <div class="count">{{ stats.failed }}</div>
+            <div class="label">Failed</div>
+        </div>
+        <div class="stat-card" onclick="location.href='/queue/rejected'">
+            <div class="count">{{ stats.rejected }}</div>
+            <div class="label">Rejected</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Quick Actions</h2>
+    <p style="color: #8892b0; margin-bottom: 15px;">
+        {% if stats.review > 0 %}
+            You have <strong style="color: #ffd700;">{{ stats.review }}</strong> items waiting for review.
+            <a href="/queue/review" style="color: #64ffda;">Review now</a>
+        {% else %}
+            No items waiting for review.
+        {% endif %}
+    </p>
+    {% if stats.failed > 0 %}
+    <p style="color: #8892b0;">
+        <strong style="color: #ff6b6b;">{{ stats.failed }}</strong> items failed processing.
+        <a href="/queue/failed" style="color: #64ffda;">View failures</a>
+    </p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>How It Works</h2>
+    <ol style="color: #8892b0; padding-left: 20px;">
+        <li>Tracks are fingerprinted and matched against MusicBrainz via AcoustID</li>
+        <li>High confidence matches (≥{{ threshold }}%) are auto-approved for tagging</li>
+        <li>Lower confidence matches go to the Review Queue for manual approval</li>
+        <li>Approved tracks have their metadata updated</li>
+    </ol>
+</div>
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}{{ queue_name|title }} Queue - Music Tagger{% endblock %}
+
+{% block content %}
+<a href="/" class="back-link">← Back to Dashboard</a>
+
+<div class="card">
+    <h2>{{ queue_name|title }} Queue ({{ total }} items)</h2>
+
+    {% if queue_name == 'review' and jobs %}
+    <div class="bulk-actions">
+        <button class="btn btn-approve" onclick="bulkApprove()">Approve Selected</button>
+        <button class="btn btn-reject" onclick="bulkReject()">Reject Selected</button>
+    </div>
+    {% endif %}
+
+    {% if jobs %}
+    <table>
+        <thead>
+            <tr>
+                {% if queue_name == 'review' %}
+                <th class="checkbox-col"><input type="checkbox" onchange="selectAll(this)"></th>
+                {% endif %}
+                <th>File</th>
+                <th>Current</th>
+                <th>Matched</th>
+                <th>Confidence</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for job in jobs %}
+            <tr>
+                {% if queue_name == 'review' %}
+                <td><input type="checkbox" name="job_id" value="{{ job.id }}"></td>
+                {% endif %}
+                <td>
+                    <a href="/job/{{ job.id }}" style="color: #64ffda;">
+                        {{ job.path.split('/')[-1][:40] }}{% if job.path.split('/')[-1]|length > 40 %}...{% endif %}
+                    </a>
+                    <div style="color: #8892b0; font-size: 0.8rem;">
+                        {{ '/'.join(job.path.split('/')[-3:-1]) }}
+                    </div>
+                </td>
+                <td>
+                    <div class="meta-value">{{ job.current_meta.get('title', '-') }}</div>
+                    <div style="color: #8892b0; font-size: 0.85rem;">{{ job.current_meta.get('artist', '-') }}</div>
+                </td>
+                <td>
+                    <div class="meta-value {% if job.current_meta.get('title') != job.matched_meta.get('title') %}meta-diff{% endif %}">
+                        {{ job.matched_meta.get('title', '-') }}
+                    </div>
+                    <div style="color: #8892b0; font-size: 0.85rem;" class="{% if job.current_meta.get('artist') != job.matched_meta.get('artist') %}meta-diff{% endif %}">
+                        {{ job.matched_meta.get('artist', '-') }}
+                    </div>
+                </td>
+                <td>
+                    {% if job.confidence %}
+                    <span class="confidence {% if job.confidence >= 80 %}high{% elif job.confidence >= 60 %}medium{% else %}low{% endif %}">
+                        {{ job.confidence|round(1) }}%
+                    </span>
+                    {% else %}
+                    -
+                    {% endif %}
+                </td>
+                <td>
+                    {% if queue_name == 'review' %}
+                    <button class="btn btn-approve" onclick="approveJob({{ job.id }})">Approve</button>
+                    <button class="btn btn-reject" onclick="rejectJob({{ job.id }})">Reject</button>
+                    {% elif queue_name == 'failed' %}
+                    <button class="btn btn-retry" onclick="retryJob({{ job.id }})">Retry</button>
+                    {% else %}
+                    <a href="/job/{{ job.id }}" class="btn btn-secondary">View</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if total_pages > 1 %}
+    <div class="pagination">
+        {% if page > 1 %}
+        <a href="?page={{ page - 1 }}">← Previous</a>
+        {% endif %}
+
+        {% for p in range(1, total_pages + 1) %}
+            {% if p == page %}
+            <span class="current">{{ p }}</span>
+            {% elif p <= 3 or p > total_pages - 2 or (p >= page - 1 and p <= page + 1) %}
+            <a href="?page={{ p }}">{{ p }}</a>
+            {% elif p == 4 or p == total_pages - 2 %}
+            <span>...</span>
+            {% endif %}
+        {% endfor %}
+
+        {% if page < total_pages %}
+        <a href="?page={{ page + 1 }}">Next →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <p style="color: #8892b0; padding: 40px; text-align: center;">
+        No items in this queue.
+    </p>
+    {% endif %}
+</div>
+{% endblock %}

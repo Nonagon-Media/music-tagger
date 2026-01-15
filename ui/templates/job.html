@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Job Details - Music Tagger{% endblock %}
+
+{% block content %}
+<a href="/queue/{{ job.queue }}" class="back-link">← Back to {{ job.queue|title }} Queue</a>
+
+<div class="card">
+    <h2>Job Details</h2>
+
+    <div style="margin-bottom: 20px;">
+        <div class="meta-label">File Path</div>
+        <div class="meta-value" style="word-break: break-all;">{{ job.path }}</div>
+    </div>
+
+    <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+        <div>
+            <div class="meta-label">Queue</div>
+            <div class="meta-value">{{ job.queue }}</div>
+        </div>
+        <div>
+            <div class="meta-label">Status</div>
+            <div class="meta-value">{{ job.status }}</div>
+        </div>
+        <div>
+            <div class="meta-label">Confidence</div>
+            <div class="meta-value">
+                {% if job.confidence %}
+                <span class="confidence {% if job.confidence >= 80 %}high{% elif job.confidence >= 60 %}medium{% else %}low{% endif %}">
+                    {{ job.confidence|round(1) }}%
+                </span>
+                {% else %}
+                -
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if job.error %}
+    <div style="background: #3d1f1f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+        <div class="meta-label">Error</div>
+        <div style="color: #ff6b6b;">{{ job.error }}</div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>Metadata Comparison</h2>
+
+    <table class="diff-table">
+        <thead>
+            <tr>
+                <th style="background: #2d1f1f;">Current Metadata</th>
+                <th style="background: #1f2d1f;">Matched Metadata (MusicBrainz)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="diff-current">
+                    <div class="meta-field">
+                        <div class="meta-label">Title</div>
+                        <div class="meta-value">{{ job.current_meta.get('title', '-') }}</div>
+                    </div>
+                </td>
+                <td class="diff-matched">
+                    <div class="meta-field">
+                        <div class="meta-label">Title</div>
+                        <div class="meta-value {% if job.current_meta.get('title') != job.matched_meta.get('title') %}meta-diff{% endif %}">
+                            {{ job.matched_meta.get('title', '-') }}
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td class="diff-current">
+                    <div class="meta-field">
+                        <div class="meta-label">Artist</div>
+                        <div class="meta-value">{{ job.current_meta.get('artist', '-') }}</div>
+                    </div>
+                </td>
+                <td class="diff-matched">
+                    <div class="meta-field">
+                        <div class="meta-label">Artist</div>
+                        <div class="meta-value {% if job.current_meta.get('artist') != job.matched_meta.get('artist') %}meta-diff{% endif %}">
+                            {{ job.matched_meta.get('artist', '-') }}
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td class="diff-current">
+                    <div class="meta-field">
+                        <div class="meta-label">Album</div>
+                        <div class="meta-value">{{ job.current_meta.get('album', '-') }}</div>
+                    </div>
+                </td>
+                <td class="diff-matched">
+                    <div class="meta-field">
+                        <div class="meta-label">Album</div>
+                        <div class="meta-value {% if job.current_meta.get('album') != job.matched_meta.get('album') %}meta-diff{% endif %}">
+                            {{ job.matched_meta.get('album', '-') }}
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td class="diff-current">
+                    <div class="meta-field">
+                        <div class="meta-label">Year</div>
+                        <div class="meta-value">{{ job.current_meta.get('date', '-') }}</div>
+                    </div>
+                </td>
+                <td class="diff-matched">
+                    <div class="meta-field">
+                        <div class="meta-label">Year</div>
+                        <div class="meta-value {% if job.current_meta.get('date') != job.matched_meta.get('date') %}meta-diff{% endif %}">
+                            {{ job.matched_meta.get('date', '-') }}
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+{% if job.queue == 'review' %}
+<div class="card">
+    <h2>Actions</h2>
+    <button class="btn btn-approve" onclick="approveJob({{ job.id }})" style="margin-right: 10px;">
+        Approve and Tag
+    </button>
+    <button class="btn btn-reject" onclick="rejectJob({{ job.id }})">
+        Reject
+    </button>
+</div>
+{% elif job.queue == 'failed' %}
+<div class="card">
+    <h2>Actions</h2>
+    <button class="btn btn-retry" onclick="retryJob({{ job.id }})">
+        Retry Analysis
+    </button>
+</div>
+{% endif %}
+{% endblock %}

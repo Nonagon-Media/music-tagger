@@ -1,0 +1,95 @@
+services:
+  redis:
+    image: redis:alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  analysis-worker:
+    build: ./worker
+    command: rq worker analysis -u redis://redis:6379
+    user: "${PUID:-1000}:${PGID:-1000}"
+    environment:
+      - ACOUSTID_API_KEY=${ACOUSTID_API_KEY}
+      - CONFIDENCE_THRESHOLD=${CONFIDENCE_THRESHOLD:-80}
+      - REDIS_URL=redis://redis:6379
+      - RATE_LIMIT_DELAY=${RATE_LIMIT_DELAY:-0.5}
+    volumes:
+      - ${MUSIC_DIR}:/music:ro
+      - ./data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  processing-worker:
+    build: ./worker
+    command: rq worker processing -u redis://redis:6379
+    user: "${PUID:-1000}:${PGID:-1000}"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - WRITE_DELAY=${WRITE_DELAY:-0.5}
+    volumes:
+      - ${MUSIC_DIR}:/music:rw
+      - ./data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    profiles:
+      - apply
+    restart: unless-stopped
+
+  batch-processor:
+    build: ./worker
+    command: /scripts/batch_process.sh
+    user: "${PUID:-1000}:${PGID:-1000}"
+    environment:
+      - ACOUSTID_API_KEY=${ACOUSTID_API_KEY}
+      - CONFIDENCE_THRESHOLD=${CONFIDENCE_THRESHOLD:-80}
+      - REDIS_URL=redis://redis:6379
+      - RATE_LIMIT_DELAY=${RATE_LIMIT_DELAY:-0.5}
+    volumes:
+      - ${MUSIC_DIR}:/music:ro
+      - ./data:/data
+      - ./scripts:/scripts:ro
+      - ./logs:/opt/music-tagger/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    profiles:
+      - batch
+    restart: "no"
+
+  rq-dashboard:
+    image: eoranged/rq-dashboard
+    ports:
+      - "${DASHBOARD_PORT:-9181}:9181"
+    environment:
+      - RQ_DASHBOARD_REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  review-ui:
+    build: ./ui
+    ports:
+      - "${UI_PORT:-8080}:8080"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - CONFIDENCE_THRESHOLD=${CONFIDENCE_THRESHOLD:-80}
+    volumes:
+      - ./data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  redis-data:

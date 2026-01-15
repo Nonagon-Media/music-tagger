@@ -105,11 +105,11 @@ def view_queue(queue_name):
         total = db.execute("SELECT COUNT(*) as count FROM jobs WHERE status = 'rejected'").fetchone()["count"]
     else:
         jobs = db.execute("""
-            SELECT * FROM jobs WHERE queue = ?
+            SELECT * FROM jobs WHERE queue = ? AND status = 'pending'
             ORDER BY confidence DESC, created_at ASC LIMIT ? OFFSET ?
         """, (queue_name, per_page, offset)).fetchall()
         total = db.execute(
-            "SELECT COUNT(*) as count FROM jobs WHERE queue = ?",
+            "SELECT COUNT(*) as count FROM jobs WHERE queue = ? AND status = 'pending'",
             (queue_name,)
         ).fetchone()["count"]
 

@@ -107,9 +107,14 @@ def fingerprint_file(filepath):
             text=True,
             timeout=60
         )
-        if result.returncode == 0:
+        # Try parsing output even if exit code is non-zero
+        # fpcalc sometimes returns errors but still produces valid fingerprints
+        if result.stdout:
             data = json.loads(result.stdout)
-            return data.get("fingerprint"), data.get("duration")
+            fingerprint = data.get("fingerprint")
+            duration = data.get("duration")
+            if fingerprint and duration:
+                return fingerprint, duration
     except Exception as e:
         return None, None
     return None, None

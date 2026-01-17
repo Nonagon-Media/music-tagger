@@ -256,26 +256,31 @@ def bulk_reject():
 @app.route("/api/retry/<int:job_id>", methods=["POST"])
 def retry_job(job_id):
     """Retry a failed job."""
-    db = get_db()
+    try:
+        db = get_db()
+        cursor = db.execute("""
+            UPDATE jobs SET
+                queue = 'analysis',
+                status = 'pending',
+                error = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND queue = 'failed'
+        """, (job_id,))
+        rows_affected = cursor.rowcount
+        db.commit()
+        db.close()
 
-    db.execute("""
-        UPDATE jobs SET
-            queue = 'analysis',
-            status = 'pending',
-            error = NULL,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = ? AND queue = 'failed'
-    """, (job_id,))
-    db.commit()
+        if rows_affected == 0:
+            return jsonify({"status": "error", "message": "Job not found or not in failed queue", "job_id": job_id}), 404
 
-    # Re-enqueue - use function path string since tasks module is in worker container
-    redis_conn = Redis.from_url(REDIS_URL)
-    q = Queue("analysis", connection=redis_conn)
-    q.enqueue("tasks.analyze_track", job_id)
+        # Re-enqueue - use function path string since tasks module is in worker container
+        redis_conn = Redis.from_url(REDIS_URL)
+        q = Queue("analysis", connection=redis_conn)
+        q.enqueue("tasks.analyze_track", job_id)
 
-    db.close()
-
-    return jsonify({"status": "retried", "job_id": job_id})
+        return jsonify({"status": "retried", "job_id": job_id, "rows_affected": rows_affected})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "job_id": job_id}), 500
 
 
 @app.route("/api/stats")

@@ -56,12 +56,16 @@ def get_queue_stats():
     db = get_db()
     stats = {}
 
-    for queue in ["analysis", "review", "processing", "failed"]:
+    for queue in ["analysis", "review", "processing"]:
         count = db.execute(
             "SELECT COUNT(*) as count FROM jobs WHERE queue = ? AND status = 'pending'",
             (queue,)
         ).fetchone()["count"]
         stats[queue] = count
+
+    stats["failed"] = db.execute(
+        "SELECT COUNT(*) as count FROM jobs WHERE queue = 'failed' AND status = 'failed'"
+    ).fetchone()["count"]
 
     stats["done"] = db.execute(
         "SELECT COUNT(*) as count FROM jobs WHERE status = 'done'"
@@ -172,14 +176,10 @@ def approve_job(job_id):
     db.close()
 
     if job:
-        # Enqueue for processing
+        # Enqueue for processing - use function path string since tasks module is in worker container
         redis_conn = Redis.from_url(REDIS_URL)
         q = Queue("processing", connection=redis_conn)
-        # Import here to avoid circular imports
-        import sys
-        sys.path.insert(0, "/app")
-        from tasks import write_tags
-        q.enqueue(write_tags, job_id)
+        q.enqueue("tasks.write_tags", job_id)
 
     return jsonify({"status": "approved", "job_id": job_id})
 
@@ -218,11 +218,7 @@ def bulk_approve():
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND queue = 'review'
         """, (job_id,))
-
-        import sys
-        sys.path.insert(0, "/app")
-        from tasks import write_tags
-        q.enqueue(write_tags, job_id)
+        q.enqueue("tasks.write_tags", job_id)
         approved += 1
 
     db.commit()
@@ -266,14 +262,10 @@ def retry_job(job_id):
     """, (job_id,))
     db.commit()
 
-    # Re-enqueue
+    # Re-enqueue - use function path string since tasks module is in worker container
     redis_conn = Redis.from_url(REDIS_URL)
     q = Queue("analysis", connection=redis_conn)
-
-    import sys
-    sys.path.insert(0, "/app")
-    from tasks import analyze_track
-    q.enqueue(analyze_track, job_id)
+    q.enqueue("tasks.analyze_track", job_id)
 
     db.close()
 

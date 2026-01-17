@@ -107,6 +107,12 @@ def view_queue(queue_name):
             ORDER BY updated_at DESC LIMIT ? OFFSET ?
         """, (per_page, offset)).fetchall()
         total = db.execute("SELECT COUNT(*) as count FROM jobs WHERE status = 'rejected'").fetchone()["count"]
+    elif queue_name == "failed":
+        jobs = db.execute("""
+            SELECT * FROM jobs WHERE queue = 'failed' AND status = 'failed'
+            ORDER BY updated_at DESC LIMIT ? OFFSET ?
+        """, (per_page, offset)).fetchall()
+        total = db.execute("SELECT COUNT(*) as count FROM jobs WHERE queue = 'failed' AND status = 'failed'").fetchone()["count"]
     else:
         jobs = db.execute("""
             SELECT * FROM jobs WHERE queue = ? AND status = 'pending'

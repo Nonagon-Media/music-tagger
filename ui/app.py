@@ -256,8 +256,15 @@ def bulk_reject():
 @app.route("/api/retry/<int:job_id>", methods=["POST"])
 def retry_job(job_id):
     """Retry a failed job."""
+    import sys
     try:
+        print(f"[RETRY] Starting retry for job {job_id}", file=sys.stderr)
         db = get_db()
+
+        # Check before
+        before = db.execute("SELECT queue, status FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        print(f"[RETRY] Before: {dict(before) if before else None}", file=sys.stderr)
+
         cursor = db.execute("""
             UPDATE jobs SET
                 queue = 'analysis',
@@ -267,8 +274,14 @@ def retry_job(job_id):
             WHERE id = ? AND queue = 'failed'
         """, (job_id,))
         rows_affected = cursor.rowcount
-        db.commit()
+        print(f"[RETRY] Rows affected: {rows_affected}", file=sys.stderr)
+
+        # Check after (before close)
+        after = db.execute("SELECT queue, status FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        print(f"[RETRY] After: {dict(after) if after else None}", file=sys.stderr)
+
         db.close()
+        print(f"[RETRY] DB closed", file=sys.stderr)
 
         if rows_affected == 0:
             return jsonify({"status": "error", "message": "Job not found or not in failed queue", "job_id": job_id}), 404
@@ -277,9 +290,11 @@ def retry_job(job_id):
         redis_conn = Redis.from_url(REDIS_URL)
         q = Queue("analysis", connection=redis_conn)
         q.enqueue("tasks.analyze_track", job_id)
+        print(f"[RETRY] Enqueued to Redis", file=sys.stderr)
 
         return jsonify({"status": "retried", "job_id": job_id, "rows_affected": rows_affected})
     except Exception as e:
+        print(f"[RETRY] Exception: {e}", file=sys.stderr)
         return jsonify({"status": "error", "message": str(e), "job_id": job_id}), 500
 
 

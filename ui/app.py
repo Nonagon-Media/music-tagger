@@ -260,13 +260,18 @@ def retry_job(job_id):
     import sys
     try:
         print(f"[RETRY] Starting retry for job {job_id}", file=sys.stderr)
-        db = get_db()
+
+        # Use a fresh connection with explicit transaction control
+        conn = sqlite3.connect(str(DB_PATH))
+        conn.row_factory = sqlite3.Row
 
         # Check before
-        before = db.execute("SELECT queue, status FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        before = conn.execute("SELECT queue, status FROM jobs WHERE id = ?", (job_id,)).fetchone()
         print(f"[RETRY] Before: {dict(before) if before else None}", file=sys.stderr)
 
-        cursor = db.execute("""
+        # Explicit BEGIN
+        conn.execute("BEGIN IMMEDIATE")
+        cursor = conn.execute("""
             UPDATE jobs SET
                 queue = 'analysis',
                 status = 'pending',
@@ -276,12 +281,14 @@ def retry_job(job_id):
         """, (job_id,))
         rows_affected = cursor.rowcount
         print(f"[RETRY] Rows affected: {rows_affected}", file=sys.stderr)
+        conn.execute("COMMIT")
+        print(f"[RETRY] Committed", file=sys.stderr)
 
-        # Check after (before close)
-        after = db.execute("SELECT queue, status FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        # Check after
+        after = conn.execute("SELECT queue, status FROM jobs WHERE id = ?", (job_id,)).fetchone()
         print(f"[RETRY] After: {dict(after) if after else None}", file=sys.stderr)
 
-        db.close()
+        conn.close()
         print(f"[RETRY] DB closed", file=sys.stderr)
 
         if rows_affected == 0:
@@ -296,6 +303,8 @@ def retry_job(job_id):
         return jsonify({"status": "retried", "job_id": job_id, "rows_affected": rows_affected})
     except Exception as e:
         print(f"[RETRY] Exception: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
         return jsonify({"status": "error", "message": str(e), "job_id": job_id}), 500
 
 

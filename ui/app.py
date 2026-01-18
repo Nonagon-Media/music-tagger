@@ -25,6 +25,7 @@ def get_db():
     """Get database connection."""
     db = sqlite3.connect(str(DB_PATH), isolation_level=None)
     db.row_factory = sqlite3.Row
+    db.execute("PRAGMA journal_mode=DELETE")
     return db
 
 

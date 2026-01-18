@@ -257,9 +257,20 @@ def bulk_reject():
 @app.route("/api/retry/<int:job_id>", methods=["POST"])
 def retry_job(job_id):
     """Retry a failed job."""
-    db = get_db()
+    import sys
 
-    # Update job - same pattern as approve_job
+    print(f"[RETRY] DB_PATH = {DB_PATH}", file=sys.stderr)
+    print(f"[RETRY] DB_PATH exists = {DB_PATH.exists()}", file=sys.stderr)
+
+    # Use explicit connection without isolation_level=None
+    db = sqlite3.connect(str(DB_PATH))
+    db.row_factory = sqlite3.Row
+
+    # Check before
+    before = db.execute("SELECT queue, status FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    print(f"[RETRY] Before: {dict(before) if before else None}", file=sys.stderr)
+
+    # Update job
     cursor = db.execute("""
         UPDATE jobs SET
             queue = 'analysis',
@@ -268,13 +279,25 @@ def retry_job(job_id):
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ? AND queue = 'failed'
     """, (job_id,))
+    print(f"[RETRY] Rows affected: {cursor.rowcount}", file=sys.stderr)
     db.commit()
+    print(f"[RETRY] Committed", file=sys.stderr)
 
-    if cursor.rowcount == 0:
-        db.close()
-        return jsonify({"status": "error", "message": "Job not found or not in failed queue", "job_id": job_id}), 404
+    # Check after within same connection
+    after = db.execute("SELECT queue, status FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    print(f"[RETRY] After (same conn): {dict(after) if after else None}", file=sys.stderr)
 
     db.close()
+
+    # Check with new connection
+    db2 = sqlite3.connect(str(DB_PATH))
+    db2.row_factory = sqlite3.Row
+    after2 = db2.execute("SELECT queue, status FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    print(f"[RETRY] After (new conn): {dict(after2) if after2 else None}", file=sys.stderr)
+    db2.close()
+
+    if cursor.rowcount == 0:
+        return jsonify({"status": "error", "message": "Job not found or not in failed queue", "job_id": job_id}), 404
 
     # Re-enqueue - use function path string since tasks module is in worker container
     redis_conn = Redis.from_url(REDIS_URL)

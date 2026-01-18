@@ -257,55 +257,31 @@ def bulk_reject():
 @app.route("/api/retry/<int:job_id>", methods=["POST"])
 def retry_job(job_id):
     """Retry a failed job."""
-    import sys
-    try:
-        print(f"[RETRY] Starting retry for job {job_id}", file=sys.stderr)
+    db = get_db()
 
-        # Use a fresh connection with explicit transaction control
-        conn = sqlite3.connect(str(DB_PATH))
-        conn.row_factory = sqlite3.Row
+    # Update job - same pattern as approve_job
+    cursor = db.execute("""
+        UPDATE jobs SET
+            queue = 'analysis',
+            status = 'pending',
+            error = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND queue = 'failed'
+    """, (job_id,))
+    db.commit()
 
-        # Check before
-        before = conn.execute("SELECT queue, status FROM jobs WHERE id = ?", (job_id,)).fetchone()
-        print(f"[RETRY] Before: {dict(before) if before else None}", file=sys.stderr)
+    if cursor.rowcount == 0:
+        db.close()
+        return jsonify({"status": "error", "message": "Job not found or not in failed queue", "job_id": job_id}), 404
 
-        # Explicit BEGIN
-        conn.execute("BEGIN IMMEDIATE")
-        cursor = conn.execute("""
-            UPDATE jobs SET
-                queue = 'analysis',
-                status = 'pending',
-                error = NULL,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ? AND queue = 'failed'
-        """, (job_id,))
-        rows_affected = cursor.rowcount
-        print(f"[RETRY] Rows affected: {rows_affected}", file=sys.stderr)
-        conn.execute("COMMIT")
-        print(f"[RETRY] Committed", file=sys.stderr)
+    db.close()
 
-        # Check after
-        after = conn.execute("SELECT queue, status FROM jobs WHERE id = ?", (job_id,)).fetchone()
-        print(f"[RETRY] After: {dict(after) if after else None}", file=sys.stderr)
+    # Re-enqueue - use function path string since tasks module is in worker container
+    redis_conn = Redis.from_url(REDIS_URL)
+    q = Queue("analysis", connection=redis_conn)
+    q.enqueue("tasks.analyze_track", job_id)
 
-        conn.close()
-        print(f"[RETRY] DB closed", file=sys.stderr)
-
-        if rows_affected == 0:
-            return jsonify({"status": "error", "message": "Job not found or not in failed queue", "job_id": job_id}), 404
-
-        # Re-enqueue - use function path string since tasks module is in worker container
-        redis_conn = Redis.from_url(REDIS_URL)
-        q = Queue("analysis", connection=redis_conn)
-        q.enqueue("tasks.analyze_track", job_id)
-        print(f"[RETRY] Enqueued to Redis", file=sys.stderr)
-
-        return jsonify({"status": "retried", "job_id": job_id, "rows_affected": rows_affected})
-    except Exception as e:
-        print(f"[RETRY] Exception: {e}", file=sys.stderr)
-        import traceback
-        traceback.print_exc()
-        return jsonify({"status": "error", "message": str(e), "job_id": job_id}), 500
+    return jsonify({"status": "retried", "job_id": job_id})
 
 
 @app.route("/api/stats")

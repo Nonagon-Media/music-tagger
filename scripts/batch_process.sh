@@ -10,7 +10,7 @@ set -e
 # Configuration
 MUSIC_DIR="/music"
 LOG_FILE="/opt/music-tagger/logs/batch_process.log"
-DELAY_BETWEEN_ARTISTS=300  # 5 minutes between artists
+DELAY_BETWEEN_ARTISTS=180  # 3 minutes between artists
 POLL_INTERVAL=30           # Check job status every 30 seconds
 DATA_DIR="/data"
 

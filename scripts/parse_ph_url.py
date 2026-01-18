@@ -38,10 +38,19 @@ def parse_pornhub_url(url):
     # Extract studio/album from "author" field
     author_match = re.search(r'"author"\s*:\s*"([^"]+)"', html)
     album = None
+    author = None
     if author_match:
-        album = author_match.group(1)
+        author = author_match.group(1)
 
-    # Fallback: try to get from tags
+    # If no pornstar (amateur content), use author/uploader as artist
+    if not artist and author:
+        artist = author
+        album = "Amateur"
+    else:
+        # For professional content, author is the studio/album
+        album = author
+
+    # Fallback: try to get album from tags if still not set
     if not album:
         tag_match = re.search(r"data-context-tag='([^']+)'", html)
         if tag_match:

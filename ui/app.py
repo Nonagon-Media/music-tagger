@@ -23,7 +23,7 @@ DB_PATH = DATA_DIR / "music_tagger.db"
 
 def get_db():
     """Get database connection."""
-    db = sqlite3.connect(str(DB_PATH))
+    db = sqlite3.connect(str(DB_PATH), isolation_level=None)
     db.row_factory = sqlite3.Row
     return db
 
